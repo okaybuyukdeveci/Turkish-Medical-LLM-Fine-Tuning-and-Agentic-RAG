@@ -1,0 +1,46 @@
+@startuml agentic_rag_architecture
+!theme plain
+title Agentic RAG — Türkçe Medikal Retrieve & Synthesize
+
+|#lightblue|Indexing Pipeline (main_retriever.py)|
+start
+:data/*.md
+(data_loader.load_documents);
+:normalize_markdown_headers
+(MinerU err: 1.1 / A) / 2) demote);
+:MarkdownHeaderTextSplitter
+(# / ## / ### bölümlere ayır);
+if (bölüm uzunluğu > chunk_size=600?) then (evet)
+  :RecursiveCharacterTextSplitter
+  (overlap=100);
+else (hayır)
+endif
+:breadcrumb metadata
+(BRANŞ > Bölüm > Başlık);
+:Qdrant (lokal)
+with embedding intfloat/multilingual-e5-base
+(birleştir: source, category, breadcrumb, chunk);
+:VectorStoreRetriever k=6;
+|#lightblue|Agent B: Responder|
+:hekimin (Türkçe) sorusu;
+if (bilgi sorusu? ve max_retrievals=1?) then (evet)
+  |#lightblue|Agent A: retrieve_documents|
+  :semantik sorgu;
+  :Qdrant tarama (metadata filtreleme);
+  :retrieved: top-6 breadcrumb'lı chunk;
+  |#lightblue|Pruner|
+  :dokümanı buda (soruyla ilgili kısım);
+  |#lightblue|Agent B: Responder|
+  :breadcrumb'lı sentez;
+else (hayır / chit-chat)
+endif
+if (tur bitti?) then (evet)
+  |#lightblue|Compactor|
+  :tur gürültüsünü özet işaretine indir;
+endif
+|#lightblue|Agent B: Responder|
+:hevime atıflı cevap;
+stop
+
+footer document_chunker.py · 3 aşamalı hiyerarşik parçalama → docs/agentic-rag-architecture.puml
+@enduml
