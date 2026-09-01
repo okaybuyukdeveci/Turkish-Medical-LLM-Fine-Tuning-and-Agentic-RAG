@@ -1,0 +1,9 @@
+langgraph
+langchain-core
+langchain-huggingface
+langchain-qdrant
+langchain-text-splitters
+python-dotenv
+ipykernel
+requests
+sentence-transformers
