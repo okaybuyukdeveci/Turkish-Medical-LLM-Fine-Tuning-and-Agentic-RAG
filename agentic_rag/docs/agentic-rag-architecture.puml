@@ -1,46 +1,43 @@
 @startuml agentic_rag_architecture
 !theme plain
-title Agentic RAG — Türkçe Medikal Retrieve & Synthesize
+title Turkish Medical Agentic RAG
 
-|#lightblue|Indexing Pipeline (main_retriever.py)|
-start
-:data/*.md
-(data_loader.load_documents);
-:normalize_markdown_headers
-(MinerU err: 1.1 / A) / 2) demote);
-:MarkdownHeaderTextSplitter
-(# / ## / ### bölümlere ayır);
-if (bölüm uzunluğu > chunk_size=600?) then (evet)
-  :RecursiveCharacterTextSplitter
-  (overlap=100);
-else (hayır)
-endif
-:breadcrumb metadata
-(BRANŞ > Bölüm > Başlık);
-:Qdrant (lokal)
-with embedding intfloat/multilingual-e5-base
-(birleştir: source, category, breadcrumb, chunk);
-:VectorStoreRetriever k=6;
-|#lightblue|Agent B: Responder|
-:hekimin (Türkçe) sorusu;
-if (bilgi sorusu? ve max_retrievals=1?) then (evet)
-  |#lightblue|Agent A: retrieve_documents|
-  :semantik sorgu;
-  :Qdrant tarama (metadata filtreleme);
-  :retrieved: top-6 breadcrumb'lı chunk;
-  |#lightblue|Pruner|
-  :dokümanı buda (soruyla ilgili kısım);
-  |#lightblue|Agent B: Responder|
-  :breadcrumb'lı sentez;
-else (hayır / chit-chat)
-endif
-if (tur bitti?) then (evet)
-  |#lightblue|Compactor|
-  :tur gürültüsünü özet işaretine indir;
-endif
-|#lightblue|Agent B: Responder|
-:hevime atıflı cevap;
-stop
+package "Indexing (explicit lifecycle)" {
+  [data/*.md] --> [Markdown loader]
+  [Markdown loader] --> [# / ## parser]
+  [# / ## parser] --> [384-token contextual chunks]
+  [384-token contextual chunks] --> [E5 passage embeddings]
+  [E5 passage embeddings] --> [Local Qdrant]
+  [Corpus + settings] --> [Index manifest]
+}
 
-footer document_chunker.py · 3 aşamalı hiyerarşik parçalama → docs/agentic-rag-architecture.puml
+package "Retrieval" {
+  [User search query] --> [E5 query embedding]
+  [E5 query embedding] --> [Local Qdrant]
+  [Local Qdrant] --> [Top-6 source-labelled evidence]
+}
+
+package "LangGraph" {
+  [START] --> [Responder]
+  [Responder] --> [Retrieval Tool] : one tool call
+  [Retrieval Tool] --> [Pruner]
+  [Pruner] --> [Responder] : labelled evidence
+  [Responder] --> [Compactor] : final Turkish answer
+  [Compactor] --> [END]
+}
+
+[Top-6 source-labelled evidence] --> [Retrieval Tool]
+
+note right of [Index manifest]
+Missing index: create
+Exact match: reuse
+Mismatch: fail until --force
+end note
+
+note right of [384-token contextual chunks]
+page_content repeats:
+# title
+## optional subtitle
+body
+end note
 @enduml

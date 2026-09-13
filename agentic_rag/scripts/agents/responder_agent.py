@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 
 from scripts.prompts.prompts import RESPONDER_SYSTEM_PROMPT_TEMPLATE
 
@@ -20,8 +20,10 @@ def _retrievals_this_turn(messages: list) -> int:
     return count
 
 
-def make_responder_node(llm):
-    """llm must already have `retrieve_documents` bound via .bind_tools()."""
+def make_responder_node(llm, retrieval_tool):
+    """Use the tool-bound model once, then force an ordinary final response."""
+
+    llm_with_tools = llm.bind_tools([retrieval_tool])
 
     def responder_node(state: dict) -> dict:
         count = _retrievals_this_turn(state["messages"])
@@ -31,7 +33,8 @@ def make_responder_node(llm):
             )
         )
         messages = [system] + state["messages"]
-        ai_message = llm.invoke(messages)
+        active_llm = llm_with_tools if count < MAX_RETRIEVALS else llm
+        ai_message = active_llm.invoke(messages)
         ai_message.name = "responder"
         return {"messages": [ai_message]}
 

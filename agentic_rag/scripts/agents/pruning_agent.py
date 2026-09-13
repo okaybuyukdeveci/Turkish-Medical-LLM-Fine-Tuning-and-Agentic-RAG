@@ -18,6 +18,9 @@ def _last_retrieval_query(messages: list) -> str:
 def make_pruning_node(llm):
     def pruning_node(state: dict) -> dict:
         tool_message = state["messages"][-1]
+        artifact = getattr(tool_message, "artifact", None)
+        if isinstance(artifact, dict) and artifact.get("status") != "ok":
+            return {}
         query = _last_retrieval_query(state["messages"])
         system = SystemMessage(
             content=PRUNING_SYSTEM_PROMPT_TEMPLATE.format(initial_request=query)
@@ -28,6 +31,7 @@ def make_pruning_node(llm):
             name=tool_message.name,
             tool_call_id=tool_message.tool_call_id,
             id=tool_message.id,
+            artifact=artifact,
         )
         return {"messages": [updated_tool_message]}
 
