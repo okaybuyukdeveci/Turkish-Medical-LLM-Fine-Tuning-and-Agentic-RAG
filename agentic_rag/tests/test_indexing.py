@@ -1,5 +1,6 @@
 import hashlib
 import uuid
+from dataclasses import replace
 
 import pytest
 from langchain_core.documents import Document
@@ -7,7 +8,10 @@ from langchain_core.embeddings import Embeddings
 
 from scripts.indexing import indexer
 from scripts.indexing.indexer import StaleIndexError, ensure_index
+from scripts.retrieval import retriever as retriever_module
+from scripts.retrieval.parent_store import ParentDocumentStore
 from scripts.retrieval.qdrant_store import LocalQdrantStore
+from scripts.retrieval.retriever import ParentDocumentRetriever
 from scripts.settings import RagSettings
 
 
@@ -53,6 +57,25 @@ def test_local_qdrant_build_count_and_metadata_round_trip(tmp_path):
     store.close()
 
 
+def test_parent_retriever_deduplicates_children(tmp_path):
+    parent = qdrant_document("# title\n\nparent evidence", 0)
+    children = [qdrant_document("alpha first", 1), qdrant_document("alpha second", 2)]
+    for child in children:
+        child.metadata["parent_id"] = parent.metadata["chunk_id"]
+    parent_path = tmp_path / "qdrant" / "parent_documents.sqlite"
+    ParentDocumentStore(parent_path).write([parent])
+    store = LocalQdrantStore(FakeEmbeddings(), tmp_path / "qdrant", "test", 2)
+    store.build(children)
+    retriever = ParentDocumentRetriever(
+        child_retriever=store.as_retriever(k=2), parent_store_path=parent_path
+    )
+
+    assert [document.page_content for document in retriever.invoke("alpha")] == [
+        parent.page_content
+    ]
+    store.close()
+
+
 def test_index_manifest_reuse_staleness_and_force_rebuild(tmp_path, monkeypatch):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
@@ -71,17 +94,28 @@ def test_index_manifest_reuse_staleness_and_force_rebuild(tmp_path, monkeypatch)
     )
     monkeypatch.setattr(indexer, "E5Embeddings", lambda *args, **kwargs: FakeEmbeddings())
     monkeypatch.setattr(
-        indexer,
-        "chunk_documents",
-        lambda documents, config: [qdrant_document(documents[0].page_content, 0)],
+        retriever_module, "E5Embeddings", lambda *args, **kwargs: FakeEmbeddings()
     )
+    def fake_chunking(documents, parent_config, child_config):
+        parent = qdrant_document(documents[0].page_content, 0)
+        child = qdrant_document(documents[0].page_content, 1)
+        child.metadata["parent_id"] = parent.metadata["chunk_id"]
+        return [parent], [child]
+
+    monkeypatch.setattr(indexer, "chunk_parent_child_documents", fake_chunking)
 
     created = ensure_index(settings)
     reused = ensure_index(settings)
 
     assert created.status == "created"
     assert reused.status == "reused"
+    assert reused.parent_count == 1
     assert reused.chunk_count == 1
+    assert ParentDocumentStore(settings.parent_store_path).count() == 1
+
+    parent_retriever = retriever_module.load_retriever(settings)
+    assert parent_retriever.invoke("alpha")[0].page_content == "# title\nbody"
+    parent_retriever.child_retriever.vectorstore.client.close()
 
     source.write_text("# title\nchanged body", encoding="utf-8")
     with pytest.raises(StaleIndexError, match="stale"):
@@ -90,3 +124,11 @@ def test_index_manifest_reuse_staleness_and_force_rebuild(tmp_path, monkeypatch)
     rebuilt = ensure_index(settings, force_recreate=True)
     assert rebuilt.status == "rebuilt"
     assert rebuilt.corpus_hash != created.corpus_hash
+
+    changed_parent_settings = replace(settings, parent_chunk_size_tokens=3000)
+    with pytest.raises(StaleIndexError, match="stale"):
+        ensure_index(changed_parent_settings)
+
+    settings.parent_store_path.unlink()
+    with pytest.raises(StaleIndexError, match="parent document store"):
+        ensure_index(settings)

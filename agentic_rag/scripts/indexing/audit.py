@@ -10,7 +10,7 @@ from collections import Counter
 from scripts.indexing.chunker import (
     ChunkingConfig,
     _has_substantive_body,
-    chunk_documents,
+    chunk_parent_child_documents,
 )
 from scripts.indexing.loader import load_markdown_documents
 from scripts.settings import RagSettings
@@ -21,7 +21,12 @@ _EMPTY_ALT_IMAGE = re.compile(r"!\[\s*\]\([^)]*\)")
 
 def audit_corpus(settings: RagSettings) -> dict:
     documents = load_markdown_documents(settings.data_dir)
-    config = ChunkingConfig(
+    parent_config = ChunkingConfig(
+        tokenizer_name=settings.embedding_model,
+        max_tokens=settings.parent_chunk_size_tokens,
+        overlap_tokens=0,
+    )
+    child_config = ChunkingConfig(
         tokenizer_name=settings.embedding_model,
         max_tokens=settings.chunk_size_tokens,
         overlap_tokens=settings.chunk_overlap_tokens,
@@ -29,7 +34,9 @@ def audit_corpus(settings: RagSettings) -> dict:
     from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(settings.embedding_model)
-    chunks = chunk_documents(documents, config, tokenizer=tokenizer)
+    parents, chunks = chunk_parent_child_documents(
+        documents, parent_config, child_config, tokenizer=tokenizer
+    )
     token_counts = [
         len(
             tokenizer.encode(
@@ -38,10 +45,20 @@ def audit_corpus(settings: RagSettings) -> dict:
         )
         for chunk in chunks
     ]
+    parent_token_counts = [
+        len(
+            tokenizer.encode(
+                parent.page_content, add_special_tokens=False, verbose=False
+            )
+        )
+        for parent in parents
+    ]
     ordered = sorted(token_counts)
     return {
         "document_count": len(documents),
         "word_count": sum(len(document.page_content.split()) for document in documents),
+        "parent_count": len(parents),
+        "parent_max_tokens": max(parent_token_counts),
         "chunk_count": len(chunks),
         "removed_empty_image_references": sum(
             len(_EMPTY_ALT_IMAGE.findall(document.page_content)) for document in documents

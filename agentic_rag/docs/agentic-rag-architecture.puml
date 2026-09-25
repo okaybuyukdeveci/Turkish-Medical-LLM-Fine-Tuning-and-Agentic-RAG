@@ -5,16 +5,20 @@ title Turkish Medical Agentic RAG
 package "Indexing (explicit lifecycle)" {
   [data/*.md] --> [Markdown loader]
   [Markdown loader] --> [# / ## parser]
-  [# / ## parser] --> [384-token contextual chunks]
-  [384-token contextual chunks] --> [E5 passage embeddings]
-  [E5 passage embeddings] --> [Local Qdrant]
+  [# / ## parser] --> [2000-token parents]
+  [2000-token parents] --> [Local SQLite parent store]
+  [2000-token parents] --> [250-token children]
+  [250-token children] --> [E5 passage embeddings]
+  [E5 passage embeddings] --> [Local Qdrant children]
   [Corpus + settings] --> [Index manifest]
 }
 
 package "Retrieval" {
   [User search query] --> [E5 query embedding]
-  [E5 query embedding] --> [Local Qdrant]
-  [Local Qdrant] --> [Top-6 source-labelled evidence]
+  [E5 query embedding] --> [Local Qdrant children]
+  [Local Qdrant children] --> [Parent ID lookup]
+  [Local SQLite parent store] --> [Parent ID lookup]
+  [Parent ID lookup] --> [Source-labelled parent evidence]
 }
 
 package "LangGraph" {
@@ -26,7 +30,7 @@ package "LangGraph" {
   [Compactor] --> [END]
 }
 
-[Top-6 source-labelled evidence] --> [Retrieval Tool]
+[Source-labelled parent evidence] --> [Retrieval Tool]
 
 note right of [Index manifest]
 Missing index: create
@@ -34,7 +38,7 @@ Exact match: reuse
 Mismatch: fail until --force
 end note
 
-note right of [384-token contextual chunks]
+note right of [250-token children]
 page_content repeats:
 # title
 ## optional subtitle

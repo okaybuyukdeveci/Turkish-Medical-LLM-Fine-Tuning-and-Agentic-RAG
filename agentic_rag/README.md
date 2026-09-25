@@ -1,6 +1,6 @@
 # Turkish Medical Agentic RAG
 
-This project loads the Turkish medical Markdown corpus in `data/`, creates heading-aware chunks, indexes them into a persisted local Qdrant collection, and runs a LangGraph workflow:
+This project loads the Turkish medical Markdown corpus in `data/`, creates heading-aware parent and child chunks, indexes the children in local Qdrant, stores the parents in local SQLite, and runs a LangGraph workflow:
 
 ```text
 Responder -> Retrieval Tool -> Pruner -> Responder -> Compactor
@@ -32,7 +32,7 @@ Create the collection when it does not exist:
 python3 -m scripts.indexing.indexer
 ```
 
-The command records a manifest containing source hashes and all index-shaping settings. Later runs reuse an exact match. If the data, embedding model, or chunk settings changed, indexing stops rather than silently deleting the collection. Review the change and explicitly rebuild:
+The command records a manifest containing source hashes and all index-shaping settings. Later runs reuse an exact match. If the data, embedding model, or chunk settings changed, indexing stops rather than silently deleting the collection. The previous single-level index must be rebuilt once for parent–child retrieval:
 
 ```bash
 python3 -m scripts.indexing.indexer --force
@@ -44,27 +44,27 @@ Inspect corpus-wide chunk metrics without writing to Qdrant:
 python3 -m scripts.indexing.audit
 ```
 
-Local Qdrant files are written to `qdrant_storage/` and ignored by Git. Embedded Qdrant is intended for one notebook/process at a time.
+Child vectors are written to `qdrant_storage/` and parent documents to `qdrant_storage/parent_documents.sqlite`; both are ignored by Git. Embedded Qdrant is intended for one notebook/process at a time. Close the notebook kernel before rebuilding from the CLI.
 
 ## Run the agent
 
 Open `main.ipynb` from the `agentic_rag/` directory and use **Run All**. The notebook:
 
-1. loads settings and previews chunk statistics;
-2. creates or validates the index;
-3. performs a retrieval sanity check;
+1. loads settings and previews parent and child chunk statistics;
+2. creates or validates the Qdrant index and parent store;
+3. performs a retrieval sanity check that returns parent documents;
 4. creates Together AI clients and compiles the graph;
 5. displays the graph and defines a stateful `chat()` helper;
 6. runs one Turkish example question.
 
-Set `FORCE_REINDEX = True` in the index cell only after reviewing a stale-index error.
+Set `FORCE_REINDEX = True` in the index cell once to rebuild an older index, then restore it to `False`.
 
 ## Package layout
 
 ```text
 scripts/
   indexing/   Markdown loading, chunking, audit, index manifest and build CLI
-  retrieval/  E5 prefix adapter, local Qdrant storage and read-only retriever
+  retrieval/  E5 prefix adapter, local Qdrant and SQLite parent store, retriever
   tools/      source-preserving retrieval tool
   llm/        Together AI model construction
   agents/     responder, pruner and deterministic compactor nodes
@@ -72,7 +72,7 @@ scripts/
   prompts/    grounded-response and evidence-pruning instructions
 ```
 
-Each indexed chunk stores `source`, `category`, `document_title`, Markdown `title`, optional `subtitle`, `breadcrumb`, `chunk_index`, `content_hash`, and deterministic `chunk_id`. Its `page_content` repeats `# title` and `## subtitle` so heading context affects the passage embedding.
+Parent chunks have a 2000-token limit and no overlap. Child chunks have a 250-token limit and 60-token overlap by default. Each child stores a `parent_id` pointing to its full parent document in SQLite. Both levels keep source, heading, and deterministic chunk metadata. Qdrant searches the child embeddings; retrieval returns each matching parent once, in child relevance order.
 
 ## Tests
 

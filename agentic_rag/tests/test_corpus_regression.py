@@ -19,5 +19,7 @@ def test_complete_corpus_chunk_contract():
     assert report["non_substantive_chunks"] == 0
     assert report["remaining_empty_image_references"] == 0
     assert report["chunk_count"] > 0
-    assert report["token_counts"]["maximum"] <= 384
+    assert report["parent_count"] > 0
+    assert report["parent_max_tokens"] <= 2000
+    assert report["token_counts"]["maximum"] <= 250
     assert len(report["chunks_per_category"]) == 11

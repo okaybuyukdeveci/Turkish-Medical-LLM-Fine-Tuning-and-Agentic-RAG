@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
   <title id="title">Turkish Medical Agentic RAG architecture</title>
-  <desc id="desc">Markdown documents are chunked and indexed in Qdrant, then a LangGraph responder retrieves, prunes, answers, and compacts.</desc>
+  <desc id="desc">Markdown documents become 2000-token parents stored in SQLite and 250-token children indexed in Qdrant. A LangGraph responder retrieves parent evidence, prunes, answers, and compacts.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#334155"/></marker>
     <style>
@@ -14,9 +14,9 @@
   <text x="105" y="104" class="label">Indexing</text>
   <rect x="65" y="125" width="155" height="58" class="box"/><text x="142" y="160" class="label">data/*.md</text>
   <rect x="280" y="125" width="190" height="58" class="box"/><text x="375" y="150" class="label"># / ## parsing</text><text x="375" y="170" class="label">+ cleanup</text>
-  <rect x="530" y="125" width="190" height="58" class="box"/><text x="625" y="150" class="label">384-token chunks</text><text x="625" y="170" class="label">with heading context</text>
+  <rect x="530" y="125" width="190" height="58" class="box"/><text x="625" y="150" class="label">2000-token parents</text><text x="625" y="170" class="label">250-token children</text>
   <rect x="780" y="125" width="155" height="58" class="box"/><text x="857" y="150" class="label">E5 passage</text><text x="857" y="170" class="label">embeddings</text>
-  <rect x="995" y="125" width="140" height="58" class="box"/><text x="1065" y="160" class="label">Qdrant</text>
+  <rect x="995" y="125" width="140" height="58" class="box"/><text x="1065" y="150" class="label">Qdrant child</text><text x="1065" y="170" class="label">SQLite parent</text>
   <path d="M220 154H280M470 154H530M720 154H780M935 154H995" class="line"/>
   <rect x="25" y="265" width="1150" height="220" fill="#f8fafc" stroke="#94a3b8" rx="14"/>
   <text x="112" y="295" class="label">LangGraph</text>

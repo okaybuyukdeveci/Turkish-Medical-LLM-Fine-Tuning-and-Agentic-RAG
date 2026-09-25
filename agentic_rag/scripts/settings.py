@@ -30,8 +30,9 @@ class RagSettings:
     embedding_model: str = "intfloat/multilingual-e5-base"
     embedding_dimension: int = 768
     embedding_device: str = "cpu"
-    chunk_size_tokens: int = 384
-    chunk_overlap_tokens: int = 48
+    parent_chunk_size_tokens: int = 2000
+    chunk_size_tokens: int = 250
+    chunk_overlap_tokens: int = 60
     retrieval_k: int = 6
     together_model: str = "zai-org/GLM-5.3-Flash"
     together_api_key: str | None = field(default=None, repr=False)
@@ -40,11 +41,21 @@ class RagSettings:
     def manifest_path(self) -> Path:
         return self.qdrant_path / "index_manifest.json"
 
+    @property
+    def parent_store_path(self) -> Path:
+        return self.qdrant_path / "parent_documents.sqlite"
+
     def validate(self) -> None:
         if not self.data_dir.is_dir():
             raise FileNotFoundError(f"Data directory does not exist: {self.data_dir}")
+        if self.parent_chunk_size_tokens <= 0:
+            raise ValueError("parent_chunk_size_tokens must be positive")
         if self.chunk_size_tokens <= 0:
             raise ValueError("chunk_size_tokens must be positive")
+        if self.chunk_size_tokens >= self.parent_chunk_size_tokens:
+            raise ValueError(
+                "chunk_size_tokens must be smaller than parent_chunk_size_tokens"
+            )
         if not 0 <= self.chunk_overlap_tokens < self.chunk_size_tokens:
             raise ValueError("chunk_overlap_tokens must be smaller than chunk_size_tokens")
         if self.retrieval_k <= 0:
@@ -82,8 +93,9 @@ class RagSettings:
             ),
             embedding_dimension=int(os.getenv("EMBEDDING_DIMENSION", "768")),
             embedding_device=os.getenv("EMBEDDING_DEVICE", "cpu"),
-            chunk_size_tokens=int(os.getenv("CHUNK_SIZE_TOKENS", "384")),
-            chunk_overlap_tokens=int(os.getenv("CHUNK_OVERLAP_TOKENS", "48")),
+            parent_chunk_size_tokens=int(os.getenv("PARENT_CHUNK_SIZE_TOKENS", "2000")),
+            chunk_size_tokens=int(os.getenv("CHUNK_SIZE_TOKENS", "250")),
+            chunk_overlap_tokens=int(os.getenv("CHUNK_OVERLAP_TOKENS", "60")),
             retrieval_k=int(os.getenv("RETRIEVAL_K", "6")),
             together_model=os.getenv("TOGETHER_MODEL", "zai-org/GLM-5.3-Flash"),
             together_api_key=os.getenv("TOGETHER_API_KEY"),

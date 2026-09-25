@@ -168,10 +168,13 @@ def chunk_documents(
                 chunk_index = source_counters.get(source, 0)
                 source_counters[source] = chunk_index + 1
                 content_hash = hashlib.sha256(page_content.encode("utf-8")).hexdigest()
+                identity = f"{source}\n{section_number}\n{piece_number}\n{content_hash}"
+                if parent_id := document.metadata.get("parent_id"):
+                    identity = f"{parent_id}\n{identity}"
                 chunk_id = str(
                     uuid.uuid5(
                         _CHUNK_NAMESPACE,
-                        f"{source}\n{section_number}\n{piece_number}\n{content_hash}",
+                        identity,
                     )
                 )
                 breadcrumb_parts = [
@@ -194,3 +197,27 @@ def chunk_documents(
     if not chunks:
         raise ValueError("The documents did not contain any indexable text")
     return chunks
+
+
+def chunk_parent_child_documents(
+    documents: list[Document],
+    parent_config: ChunkingConfig,
+    child_config: ChunkingConfig,
+    *,
+    tokenizer: Tokenizer | None = None,
+) -> tuple[list[Document], list[Document]]:
+    """Split source documents into parents and then into linked child chunks."""
+
+    selected_tokenizer = tokenizer or _load_tokenizer(parent_config.tokenizer_name)
+    parents = chunk_documents(documents, parent_config, tokenizer=selected_tokenizer)
+    children = []
+    for parent in parents:
+        parent_id = parent.metadata["chunk_id"]
+        linked_parent = Document(
+            page_content=parent.page_content,
+            metadata={**parent.metadata, "parent_id": parent_id},
+        )
+        children.extend(
+            chunk_documents([linked_parent], child_config, tokenizer=selected_tokenizer)
+        )
+    return parents, children

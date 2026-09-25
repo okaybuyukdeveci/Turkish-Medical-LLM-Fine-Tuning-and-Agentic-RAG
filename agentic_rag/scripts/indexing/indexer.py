@@ -10,14 +10,15 @@ import unicodedata
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from scripts.indexing.chunker import ChunkingConfig, chunk_documents
+from scripts.indexing.chunker import ChunkingConfig, chunk_parent_child_documents
 from scripts.indexing.loader import load_markdown_documents
 from scripts.retrieval.embeddings import E5Embeddings
+from scripts.retrieval.parent_store import ParentDocumentStore
 from scripts.retrieval.qdrant_store import LocalQdrantStore
 from scripts.settings import RagSettings
 
 
-INDEX_SCHEMA_VERSION = 1
+INDEX_SCHEMA_VERSION = 2
 
 
 class StaleIndexError(RuntimeError):
@@ -28,9 +29,11 @@ class StaleIndexError(RuntimeError):
 class IndexReport:
     status: str
     document_count: int
+    parent_count: int
     chunk_count: int
     collection_name: str
     storage_path: str
+    parent_store_path: str
     corpus_hash: str
 
 
@@ -62,6 +65,7 @@ def expected_manifest(settings: RagSettings) -> dict:
         "document_count": len(files),
         "embedding_model": settings.embedding_model,
         "embedding_dimension": settings.embedding_dimension,
+        "parent_chunk_size_tokens": settings.parent_chunk_size_tokens,
         "chunk_size_tokens": settings.chunk_size_tokens,
         "chunk_overlap_tokens": settings.chunk_overlap_tokens,
         "collection_name": settings.collection_name,
@@ -100,7 +104,11 @@ def _store(
 
 
 def _manifest_without_count(manifest: dict) -> dict:
-    return {key: value for key, value in manifest.items() if key != "chunk_count"}
+    return {
+        key: value
+        for key, value in manifest.items()
+        if key not in ("chunk_count", "parent_count")
+    }
 
 
 def validate_existing_index(settings: RagSettings) -> IndexReport:
@@ -131,12 +139,20 @@ def validate_existing_index(settings: RagSettings) -> IndexReport:
             "The Qdrant point count does not match the manifest. "
             "Rebuild with `python -m scripts.indexing.indexer --force`."
         )
+    parent_count = ParentDocumentStore(settings.parent_store_path).count()
+    if parent_count != manifest.get("parent_count") or parent_count == 0:
+        raise StaleIndexError(
+            "The local parent document store does not match the manifest. "
+            "Rebuild with `python -m scripts.indexing.indexer --force`."
+        )
     return IndexReport(
         status="reused",
         document_count=expected["document_count"],
+        parent_count=parent_count,
         chunk_count=point_count,
         collection_name=settings.collection_name,
         storage_path=str(settings.qdrant_path),
+        parent_store_path=str(settings.parent_store_path),
         corpus_hash=expected["corpus_hash"],
     )
 
@@ -159,8 +175,13 @@ def ensure_index(settings: RagSettings, force_recreate: bool = False) -> IndexRe
         )
 
     documents = load_markdown_documents(settings.data_dir)
-    chunks = chunk_documents(
+    parents, children = chunk_parent_child_documents(
         documents,
+        ChunkingConfig(
+            tokenizer_name=settings.embedding_model,
+            max_tokens=settings.parent_chunk_size_tokens,
+            overlap_tokens=0,
+        ),
         ChunkingConfig(
             tokenizer_name=settings.embedding_model,
             max_tokens=settings.chunk_size_tokens,
@@ -168,20 +189,30 @@ def ensure_index(settings: RagSettings, force_recreate: bool = False) -> IndexRe
         ),
     )
     embeddings = E5Embeddings(settings.embedding_model, settings.embedding_device)
-    point_count = _store(settings, embeddings).build(chunks)
-    if point_count != len(chunks):
+    point_count = _store(settings, embeddings).build(children)
+    if point_count != len(children):
         raise RuntimeError(
-            f"Qdrant stored {point_count} points but {len(chunks)} chunks were produced"
+            f"Qdrant stored {point_count} points but {len(children)} child chunks were produced"
         )
+    parent_store = ParentDocumentStore(settings.parent_store_path)
+    parent_store.write(parents)
+    if parent_store.count() != len(parents):
+        raise RuntimeError("The local parent document count does not match the chunks")
 
-    completed_manifest = {**expected, "chunk_count": point_count}
+    completed_manifest = {
+        **expected,
+        "parent_count": len(parents),
+        "chunk_count": point_count,
+    }
     _write_manifest(settings.manifest_path, completed_manifest)
     return IndexReport(
         status="rebuilt" if collection_exists or manifest is not None else "created",
         document_count=len(documents),
+        parent_count=len(parents),
         chunk_count=point_count,
         collection_name=settings.collection_name,
         storage_path=str(settings.qdrant_path),
+        parent_store_path=str(settings.parent_store_path),
         corpus_hash=expected["corpus_hash"],
     )
 

@@ -1,0 +1,10 @@
+{
+  "dataset": "batuhanaktas/tus_eval",
+  "split": "train (the only published split)",
+  "revision": "da3dfff0db1e14bad2a75ba54917fcfb9306cc7e",
+  "source_sha256": "699dafa2be18bd7d2c42a06d852d5246bcf3b11d5054bb1ccc13dfe391d20bb0",
+  "total_rows": 115,
+  "selected_rows": 100,
+  "seed": 20260925,
+  "row_index_base": 0
+}

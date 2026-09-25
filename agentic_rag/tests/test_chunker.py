@@ -2,7 +2,11 @@ import copy
 
 from langchain_core.documents import Document
 
-from scripts.indexing.chunker import ChunkingConfig, chunk_documents
+from scripts.indexing.chunker import (
+    ChunkingConfig,
+    chunk_documents,
+    chunk_parent_child_documents,
+)
 
 
 class CharacterTokenizer:
@@ -82,3 +86,22 @@ def test_chunking_is_deterministic_and_does_not_mutate_input():
         (chunk.page_content, chunk.metadata) for chunk in second
     ]
     assert "| 1 | 2 |" in first[0].page_content
+
+
+def test_parent_child_chunks_link_and_respect_both_limits():
+    document = make_document("# Başlık\n## Alt\n" + "kelime " * 100)
+    tokenizer = CharacterTokenizer()
+    parents, children = chunk_parent_child_documents(
+        [document],
+        ChunkingConfig(max_tokens=120, overlap_tokens=0),
+        ChunkingConfig(max_tokens=60, overlap_tokens=8),
+        tokenizer=tokenizer,
+    )
+
+    parent_ids = {parent.metadata["chunk_id"] for parent in parents}
+    assert len(parents) > 1
+    assert len(children) > len(parents)
+    assert {child.metadata["parent_id"] for child in children} == parent_ids
+    assert len({child.metadata["chunk_id"] for child in children}) == len(children)
+    assert all(len(parent.page_content) <= 120 for parent in parents)
+    assert all(len(child.page_content) <= 60 for child in children)
