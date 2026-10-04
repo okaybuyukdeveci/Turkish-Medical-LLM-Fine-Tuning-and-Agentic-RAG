@@ -1,0 +1,73 @@
+{
+  "egitim_kayit": 23957,
+  "kontrol_orani": 1.0,
+  "karar": {
+    "duzelt": 10352,
+    "at": 839,
+    "ok": 13754
+  },
+  "elenen_toplam": 1043,
+  "elenen": {
+    "eksik_bilgi": 1,
+    "baglam_gerekli": 71,
+    "onceki_soruya_bagli": 4,
+    "cevap_supheli": 428,
+    "soru_bozuk": 101,
+    "sik_kayip": 155,
+    "sik_sayisi_az": 34,
+    "gorsel_gerekli": 25,
+    "diger": 6,
+    "cevap_sikki_kayip": 51,
+    "tekrar": 167
+  },
+  "aciklama": {
+    "medyan": 578,
+    "p10": 258,
+    "p90": 1555,
+    "max": 6168,
+    "bos": 0,
+    "kisa_200alti": 1348
+  },
+  "cevap_dagilimi": {
+    "A": 4518,
+    "C": 5116,
+    "B": 4725,
+    "E": 4555,
+    "D": 5043
+  },
+  "sik_sayisi": {
+    "5": 23671,
+    "4": 286
+  },
+  "kaynak_grup": {
+    "Denemeler": 21511,
+    "Soru Kitapları": 761,
+    "Tüm TUS Soruları (30. Baskı)": 516,
+    "Tustime": 299,
+    "Tusworld": 245,
+    "Açıklamalı TUS Çıkmışları": 236,
+    "Mikrobiyoloji": 161,
+    "Tusem": 96,
+    "Biyokimya": 70,
+    "Anatomi": 58,
+    "Fizyoloji-Histoloji-Embriyoloji": 3,
+    "Küçük Stajlar": 1
+  },
+  "test": {
+    "aciklamali": 348,
+    "cevap": 316,
+    "toplam": 664,
+    "baslangic": 838,
+    "cikarilan": 174,
+    "cikarma": {
+      "otomatik_temizlik": 125,
+      "kayit_kayit_kontrol": 49
+    },
+    "kontrol_orani": 1.0
+  },
+  "acik_konular": {
+    "dogrulayici_hata": 4,
+    "aciklama_ici_celiski": 4
+  },
+  "test_notu": "Test seti once egitim setiyle AYNI temizlik hattindan gecirildi, sonra 713 kaydin tamami dort agent tarafindan tek tek okundu. Cevap anahtari DEGISTIRILMEDI — supheli olanlar cikarildi. Egitimle cakisma ve set ici kopya sifir."
+}
