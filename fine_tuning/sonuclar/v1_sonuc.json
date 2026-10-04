@@ -1,0 +1,58 @@
+{
+  "model": "Qwen/Qwen3.5-4B",
+  "smoke": false,
+  "epochs": 2,
+  "seed": 42,
+  "train_size": 23474,
+  "val_size": 479,
+  "test_size": 316,
+  "baseline": {
+    "strict": 0.6234177215189873,
+    "loose": 0.6234177215189873,
+    "format": 0.9968354430379747
+  },
+  "finetuned": {
+    "strict": 0.7088607594936709,
+    "loose": 0.7088607594936709,
+    "format": 1.0
+  },
+  "mcnemar": {
+    "only_ft": 52,
+    "only_base": 25,
+    "p": 0.002799053877277624
+  },
+  "per_group_finetuned": {
+    "Denemeler": [
+      57,
+      96
+    ],
+    "Tustime": [
+      138,
+      185
+    ],
+    "Soru Kitapları": [
+      10,
+      11
+    ],
+    "Biyokimya": [
+      10,
+      12
+    ],
+    "Fizyoloji-Histoloji-Embriyoloji": [
+      3,
+      3
+    ],
+    "Tusworld": [
+      3,
+      4
+    ],
+    "Tüm TUS Soruları (30. Baskı)": [
+      1,
+      2
+    ],
+    "Tusem": [
+      2,
+      3
+    ]
+  }
+}
