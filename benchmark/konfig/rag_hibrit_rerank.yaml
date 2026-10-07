@@ -1,0 +1,31 @@
+ad: rag_hibrit_rerank
+aciklama: >-
+  Uretim yapilandirmasi. BM25 + dense -> RRF -> cross-encoder rerank.
+  Ikisi tek tek anlamli degil (rerank p=0,17 / hibrit p=0,50), birlikte +5,1 puan (p=0,007).
+
+model:
+  taban: Qwen/Qwen3.5-4B
+  adapter: tus-llm/tus-qwen35-4b-lora
+  alt_klasor: answering
+  revizyon: main
+  dtype: bfloat16
+
+uretim:
+  max_new_tokens: 64
+  do_sample: false
+  batch: 4
+
+sistem_mesaji: >-
+  Sen bir tıp uzmanısın. Aşağıda bir TUS sorusu ve ders kitaplarından alınmış
+  ilgili bölümler var. Kaynak metni kullanarak soruyu çöz. İlk satıra
+  'Doğru cevap: <harf>) <şık metni>' yaz, ardından kısa bir açıklama ver.
+  Kaynak metin soruyu cevaplamıyorsa kendi tıbbi bilgini kullan.
+
+retrieval:
+  tur: hibrit_rerank
+  korpus: ../agentic_rag/data
+  aday_n: 30               # her iki aramadan cekilen aday sayisi
+  tut_n: 6                 # rerank sonrasi modele giden
+  rrf_k: 60
+  reranker: BAAI/bge-reranker-v2-m3
+  context_karakter: 6000

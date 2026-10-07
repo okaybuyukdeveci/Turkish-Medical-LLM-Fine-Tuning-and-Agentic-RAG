@@ -1,3 +1,7 @@
 agentic_rag/models/
 agentic_rag/logs
-benchmark/
+
+# benchmark
+benchmark/.onbellek/
+qdrant_storage/
+*.safetensors

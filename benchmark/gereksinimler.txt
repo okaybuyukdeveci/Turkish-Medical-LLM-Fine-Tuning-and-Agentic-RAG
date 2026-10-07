@@ -1,0 +1,20 @@
+# Benchmark pipeline — yalnizca olcum icin gerekenler.
+# Egitim bagimliliklari (unsloth, trl) burada YOK.
+
+torch>=2.4
+transformers>=4.57
+peft>=0.14
+accelerate
+safetensors
+pyyaml
+huggingface_hub>=0.26
+
+# retrieval yapilandirmalari icin (konfig/rag_*.yaml)
+sentence-transformers
+langchain-core
+langchain-huggingface
+langchain-qdrant
+langchain-text-splitters
+qdrant-client
+rank-bm25
+FlagEmbedding

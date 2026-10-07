@@ -1,0 +1,25 @@
+name: benchmark verisi
+
+# GPU gerektirmez. Olcumu degil, olcumun girdisini dogrular:
+# bir test seti eklendiginde egitim setiyle ortusuyor mu, sema dogru mu.
+# Bu kontrol elle iki kez yanlis yazildi (once exact match, sonra hatali
+# aday daraltma). CI'da olmasinin sebebi bu.
+
+on:
+  pull_request:
+    paths:
+      - 'benchmark/veri/**'
+      - 'benchmark/dogrula.py'
+      - 'benchmark/parmak_izi/**'
+  workflow_dispatch:
+
+jobs:
+  dogrula:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Veri setlerini dogrula
+        run: python benchmark/dogrula.py
