@@ -20,6 +20,17 @@ def _document_title(file_name: str) -> str:
     return file_name
 
 
+def markdown_paths(data_dir: Path) -> list[Path]:
+    """List canonical paths once, rejecting conflicting Unicode-name copies."""
+    unique = {}
+    for path in sorted(data_dir.rglob('*.md')):
+        name = _normalize(path.relative_to(data_dir).as_posix())
+        if name in unique and path.read_bytes() != unique[name].read_bytes():
+            raise ValueError(f'Conflicting Unicode copies: {name}')
+        unique.setdefault(name, path)
+    return [unique[name] for name in sorted(unique)]
+
+
 def load_markdown_documents(data_dir: str | Path) -> list[Document]:
     """Read every Markdown file recursively in a deterministic order."""
 
@@ -28,7 +39,7 @@ def load_markdown_documents(data_dir: str | Path) -> list[Document]:
         raise FileNotFoundError(f"Data directory does not exist: {data_path}")
 
     documents: list[Document] = []
-    for file_path in sorted(data_path.rglob("*.md"), key=lambda path: path.as_posix()):
+    for file_path in markdown_paths(data_path):
         relative_path = file_path.relative_to(data_path)
         category = relative_path.parent.as_posix()
         documents.append(

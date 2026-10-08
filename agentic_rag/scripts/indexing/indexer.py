@@ -38,8 +38,9 @@ class IndexReport:
 
 
 def _file_records(data_dir: Path) -> list[dict[str, str]]:
+    from scripts.indexing.loader import markdown_paths
     records = []
-    for file_path in sorted(data_dir.rglob("*.md"), key=lambda path: path.as_posix()):
+    for file_path in markdown_paths(data_dir):
         records.append(
             {
                 "path": unicodedata.normalize(

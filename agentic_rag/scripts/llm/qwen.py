@@ -98,6 +98,16 @@ class QwenChat:
             if getattr(message, 'tool_calls', None):
                 item['tool_calls'] = [{'type': 'function', 'function': {'name': c['name'], 'arguments': c['args']}} for c in message.tool_calls]
             history.append(item)
+        if self.tools:
+            # The benchmark asks for an answer line, but this turn must search first.
+            history[-1]['content'] = re.sub(
+                r'İlk satıra yalnızca.*?Sonrasında açıklama yazabilirsin\.',
+                '', history[-1]['content'], flags=re.S).strip()
+            history[-1]['content'] += (
+                '\n\nÖnce kaynak aramak için yalnızca bir retrieve_documents çağrısı üret. '
+                'Bu adımda soruyu cevaplama. Tek query parametresi kullan; '
+                'ikinci bir tool çağrısı üretme. Araç sonucundan sonra cevap vereceksin.'
+            )
         inputs = self.tokenizer.apply_chat_template(history, tools=self.tools or None,
             enable_thinking=False, add_generation_prompt=True, tokenize=True,
             return_dict=True, return_tensors='pt')

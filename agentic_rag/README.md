@@ -82,6 +82,13 @@ The default is float16 with automatic device placement; GPU memory and CPU
 offloading affect performance. All generations use `do_sample=False` and disable
 thinking through the base model's chat template.
 
+On the tool-bound Qwen turn, the adapter removes the benchmark's final-answer
+format instruction and appends a search-first instruction. The model still
+generates its own query and tool call; retrieval is not synthesized when it
+skips the tool. Check retrieval-call counts in each result before interpreting
+agentic scores. Unicode-equivalent corpus paths with identical bytes are counted
+once during loading and manifest validation; conflicting copies raise an error.
+
 The YAML deliberately points to `benchmark/2026/nihai/`, not the preliminary OCR
 output in `hazir/`. Complete the PDF review before creating those final files.
 Questions require `id`, `question`, and five `options` objects with `label` and
