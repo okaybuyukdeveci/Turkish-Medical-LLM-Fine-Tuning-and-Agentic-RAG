@@ -1,0 +1,14 @@
+model:
+  base: Qwen/Qwen3.5-4B
+  adapter: models/sft
+  dtype: float16
+  device_map: auto
+generation:
+  max_new_tokens: 512
+  max_input_tokens: 8192
+benchmark:
+  questions: ../benchmark/2026/nihai/questions.jsonl
+  answer_key: ../benchmark/2026/nihai/answer_key.jsonl
+  expected_questions: 200
+  output: ../benchmark/2026/results
+  modes: [base, sft, base_agentic, sft_agentic]

@@ -59,6 +59,142 @@ Open `main.ipynb` from the `agentic_rag/` directory and use **Run All**. The not
 
 Set `FORCE_REINDEX = True` in the index cell once to rebuild an older index, then restore it to `False`.
 
+## Local Qwen benchmark
+
+The notebook uses Together AI. A separate CLI runs four local Qwen conditions:
+`base`, `sft`, `base_agentic`, and `sft_agentic`. The agentic conditions reuse
+`scripts/workflow/graph.py`, the parent–child retriever, and the existing prompts.
+Both the responder and pruner use the selected model condition. No v2 router or
+hybrid retrieval is added. Retrieval remains model-driven; skipped or malformed
+tool calls are recorded rather than replaced with forced retrieval.
+
+From `agentic_rag/`, install the dependencies, including local Qwen support:
+
+```bash
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+```
+
+Configure `benchmark.yaml`. Paths are relative to the YAML file. The local LoRA
+adapter is at `models/sft`; base weights are downloaded separately from Hugging
+Face. Loading uses Transformers and PEFT directly, without an inference server.
+The default is float16 with automatic device placement; GPU memory and CPU
+offloading affect performance. All generations use `do_sample=False` and disable
+thinking through the base model's chat template.
+
+The YAML deliberately points to `benchmark/2026/nihai/`, not the preliminary OCR
+output in `hazir/`. Complete the PDF review before creating those final files.
+Questions require `id`, `question`, and five `options` objects with `label` and
+`text`. The separate answer key requires `id` and `correct_option`. The CLI checks
+counts, matching unique IDs, options, and basic answer leakage before loading the
+model; these checks do not establish OCR or medical correctness.
+
+```bash
+python3 -m scripts.evaluation.run_benchmark --validate-only
+python3 -m scripts.evaluation.run_benchmark --limit 5
+```
+
+The four modes use these model and workflow combinations:
+
+| Mode | Model | Workflow |
+| --- | --- | --- |
+| `base` | Base Qwen | Direct generation |
+| `sft` | Qwen + SFT v1 | Direct generation |
+| `base_agentic` | Base Qwen | Existing agentic graph |
+| `sft_agentic` | Qwen + SFT v1 | Same agentic graph |
+
+Run each mode separately from `agentic_rag/`:
+
+```bash
+python3 -m scripts.evaluation.run_benchmark --modes base
+python3 -m scripts.evaluation.run_benchmark --modes sft
+python3 -m scripts.evaluation.run_benchmark --modes base_agentic
+python3 -m scripts.evaluation.run_benchmark --modes sft_agentic
+```
+
+Run all four sequentially in one process, sharing the loaded model weights:
+
+```bash
+python3 -m scripts.evaluation.run_benchmark --modes base sft base_agentic sft_agentic
+```
+
+Omitting `--modes` uses the list in `benchmark.yaml`, which defaults to all four.
+To try a subset on five questions:
+
+```bash
+python3 -m scripts.evaluation.run_benchmark --modes base sft --limit 5
+```
+
+The commands are sequential evaluations. Do not launch separate agentic modes
+concurrently against the same embedded Qdrant storage.
+
+Inspect the small run for actual retrieval calls, pruning, final answers, and
+errors before starting a full benchmark. Close the notebook kernel before using
+the embedded Qdrant index in another process. For a background run:
+
+```bash
+mkdir -p logs
+nohup python3 -u -m scripts.evaluation.run_benchmark > logs/qwen-benchmark.log 2>&1 &
+```
+
+Each run gets its own results directory with the resolved configuration, one
+JSONL per mode, and `summary.json`. Per-question records contain the response,
+prediction, correctness, elapsed seconds, retrieval-call count, retrieval errors,
+and generation/graph errors. Unparseable or failed answers count as incorrect.
+The tool parser supports Qwen's XML-style retrieval calls and rejects malformed
+calls. Local Qwen generation and tool following must still be verified on the
+target hardware; adding this CLI does not establish benchmark scores.
+
+Results are saved under the YAML setting `benchmark.output`, currently
+`../benchmark/2026/results`, relative to `agentic_rag/benchmark.yaml`:
+
+```text
+benchmark/2026/results/<YYYYMMDD-HHMMSS>/
+├── config.json
+├── base.jsonl
+├── sft.jsonl
+├── base_agentic.jsonl
+├── sft_agentic.jsonl
+└── summary.json
+```
+
+Only selected modes produce JSONL files. Each invocation creates a new directory;
+previous runs are not overwritten or resumed. The root `.gitignore` excludes
+`benchmark/`, including these results.
+
+`config.json` stores the loaded YAML settings with resolved adapter path. Each
+mode's JSONL contains one record per completed question:
+
+| Field | Meaning |
+| --- | --- |
+| `id`, `mode` | Question identifier and evaluated condition |
+| `expected` | Correct option from the separate answer-key file |
+| `response` | Final model response |
+| `prediction` | A–E parsed from the initial `Doğru cevap: X` line; null if parsing fails |
+| `correct` | Whether the prediction matches the answer key |
+| `seconds` | Elapsed generation/graph time for the question; excludes initial model/index loading |
+| `retrieval_calls` | Number of tool calls retained in the returned messages |
+| `retrieval_errors` | Number of retained tool results whose artifact status is `error` |
+| `error` | Exception type and message, present when execution fails |
+
+On an execution error, the record stores `prediction: null`, `correct: false`,
+and `error`; response and retrieval fields may be absent. Each line is flushed
+immediately, so completed records remain available if the process stops.
+
+After all selected modes finish, `summary.json` stores `questions`, `accuracy`,
+and `errors` for each mode. Accuracy is a fraction from 0 to 1, with failed and
+unparseable answers counted as incorrect. `errors` counts execution exceptions,
+not every incorrect answer or retrieval failure. An interrupted run may have
+partial JSONL files without a summary.
+
+The background process log is separate from benchmark results:
+`agentic_rag/logs/qwen-benchmark.log` for the example command above. The current
+2026 launch uses `agentic_rag/logs/qwen-benchmark-2026.log`.
+
+The current compactor contains an early return and is inactive. Single-question
+runs use a fresh graph state each time. This benchmark measures the current
+graph, including its one-retrieval limit, rather than a multi-turn conversation.
+
 ## Package layout
 
 ```text
