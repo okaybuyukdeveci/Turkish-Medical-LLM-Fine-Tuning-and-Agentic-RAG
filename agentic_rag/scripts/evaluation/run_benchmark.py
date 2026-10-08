@@ -100,7 +100,24 @@ def main():
                     response = messages[-1].content
                     match = re.match(r'\s*Doğru cevap:\s*([A-E])\b', response)
                     prediction = match.group(1) if match else None
+                    calls = [call for message in messages for call in getattr(message, 'tool_calls', [])]
+                    evidence = []
+                    for message in messages:
+                        artifact = getattr(message, 'artifact', None)
+                        if isinstance(artifact, dict):
+                            evidence.append({
+                                'status': artifact.get('status'),
+                                'sources': artifact.get('sources', []),
+                                'content': message.content,
+                            })
+                    evidence_supplied = any(
+                        item['status'] == 'ok' and item['sources'] and str(item['content']).strip()
+                        for item in evidence
+                    )
                     result.update(response=response, prediction=prediction, correct=prediction == answers[row['id']],
+                        retrieval_queries=[call['args'].get('query') for call in calls],
+                        retrieval_evidence=evidence,
+                        evidence_supplied_to_answer=evidence_supplied,
                         retrieval_calls=sum(len(getattr(m, 'tool_calls', [])) for m in messages),
                         retrieval_errors=sum(getattr(m, 'artifact', {}).get('status') == 'error' for m in messages if isinstance(getattr(m, 'artifact', None), dict)))
                 except Exception as exc:
@@ -109,7 +126,14 @@ def main():
                 records.append(result)
                 handle.write(json.dumps(result, ensure_ascii=False) + '\n')
                 handle.flush()
-                print(mode, row['id'], result['correct'], flush=True)
+                print(mode, row['id'], result['correct'],
+                    f"retrieval_calls={result.get('retrieval_calls', 'unknown')}",
+                    f"evidence_supplied={result.get('evidence_supplied_to_answer', False)}",
+                    f"queries={json.dumps(result.get('retrieval_queries', []), ensure_ascii=False)}",
+                    flush=True)
+                for item in result.get('retrieval_evidence', []):
+                    print('RETRIEVAL', row['id'], f"status={item['status']}",
+                        f"sources={json.dumps(item['sources'], ensure_ascii=False)}", flush=True)
         summary[mode] = {'questions': len(records), 'accuracy': sum(r['correct'] for r in records) / len(records), 'errors': sum('error' in r for r in records)}
     (run / 'summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
     print(run, flush=True)
