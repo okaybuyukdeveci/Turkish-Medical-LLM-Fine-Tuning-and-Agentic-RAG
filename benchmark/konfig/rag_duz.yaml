@@ -21,6 +21,5 @@ sistem_mesaji: >-
 
 retrieval:
   tur: dense
-  korpus: ../agentic_rag/data
   k: 6
   context_karakter: 6000

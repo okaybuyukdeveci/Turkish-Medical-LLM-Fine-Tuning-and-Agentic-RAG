@@ -6,7 +6,7 @@ Sonuç `sonuclar/<veri>__<konfig>__<tarih>.json` olarak yazılır; soru bazında
 tahminleri de içerir — iki koşuyu paired (McNemar) karşılaştırabilmek için.
 Sadece toplam doğruluk saklamak yetmiyor, bunu bir kez zor yoldan öğrendik.
 """
-import argparse, json, os, re, sys, time, unicodedata
+import argparse, gc, json, os, re, resource, sys, time, unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -87,8 +87,9 @@ def retrieval_kur(r):
     from scripts.indexing.loader import load_markdown_documents
     from scripts.indexing.chunker import ChunkingConfig, chunk_parent_child_documents
 
-    belgeler = load_markdown_documents(str((REPO / r["korpus"]).resolve())
-                                       if not Path(r["korpus"]).is_absolute() else r["korpus"])
+    # Korpus yolu ayarin kendisinden alinir, konfigten degil: BM25'in Qdrant ile
+    # birebir ayni korpusu indeksledigi boyle garanti olur.
+    belgeler = load_markdown_documents(str(ayar.data_dir))
     parents, _ = chunk_parent_child_documents(
         belgeler,
         parent_config=ChunkingConfig(max_tokens=ayar.parent_chunk_size_tokens, overlap_tokens=0),
@@ -142,22 +143,35 @@ def main():
     if A.limit: rows = rows[:A.limit]
     print(f"veri {A.veri}: {len(rows)} soru | konfig {K['ad']}")
 
-    getir, parent_n = (None, None)
+    # Bellek sirasi onemli: retrieval yiginini (e5 + reranker + BM25 + parent
+    # chunklar) ve 4B modeli ayni anda bellekte tutmak gereksiz. Once tum
+    # getirmeyi bitirip retrieval nesnelerini birak, sonra modeli yukle.
+    from transformers import AutoTokenizer
+    tok = AutoTokenizer.from_pretrained(K["model"]["taban"])
+    if tok.pad_token is None: tok.pad_token = tok.eos_token
+    tok.padding_side = "left"
+
+    parent_n, promptlar = None, []
     if K.get("retrieval"):
         getir, parent_n = retrieval_kur(K["retrieval"])
-    model, tok, cihaz = model_yukle(K["model"])
-    print(f"cihaz: {cihaz}")
-
-    promptlar = []
-    if getir:
         lim = K["retrieval"]["context_karakter"]
         for i, r in enumerate(rows, 1):
             kul = f"KAYNAK METİN:\n{context_kur(getir(r['soru']), lim)}\n\n---\n\nSORU:\n{r['soru']}"
             promptlar.append(prompt_kur(tok, K["sistem_mesaji"], kul))
             print(f"  getirme {i}/{len(rows)}", end="\r")
         print()
+        del getir
+        import gc; gc.collect()
+        if torch.backends.mps.is_available(): torch.mps.empty_cache()
+        elif torch.cuda.is_available(): torch.cuda.empty_cache()
+        print("retrieval yigini birakildi")
     else:
         promptlar = [prompt_kur(tok, K["sistem_mesaji"], r["soru"]) for r in rows]
+
+    model, tok, cihaz = model_yukle(K["model"])
+    print(f"cihaz: {cihaz}")
+    uz = sorted(len(tok(p)["input_ids"]) for p in promptlar)
+    print(f"prompt token p50 {uz[len(uz)//2]} | p95 {uz[int(len(uz)*.95)]} | max {uz[-1]}")
 
     U, bs = K["uretim"], K["uretim"].get("batch", 8)
     outs, t0 = [], time.perf_counter()
@@ -177,7 +191,9 @@ def main():
     dogru = [str(r["dogru_cevap"]).strip().upper() for r in rows]
     n_dg  = sum(p == g for p, g in zip(pred, dogru))
     acc   = n_dg / len(rows)
+    tepe = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**30
     print(f"\n{'='*52}\n{A.veri} / {K['ad']}:  {acc:.1%}  ({n_dg}/{len(rows)})")
+    print(f"tepe bellek: {tepe:.1f} GB")
     print(f"cevapsiz {sum(p is None for p in pred)} | sure {sure/60:.1f} dk\n{'='*52}")
 
     cikti = KOK / "sonuclar" / f"{A.veri}__{K['ad']}__{date.today():%Y%m%d}.json"

@@ -23,7 +23,6 @@ sistem_mesaji: >-
 
 retrieval:
   tur: hibrit_rerank
-  korpus: ../agentic_rag/data
   aday_n: 30               # her iki aramadan cekilen aday sayisi
   tut_n: 6                 # rerank sonrasi modele giden
   rrf_k: 60

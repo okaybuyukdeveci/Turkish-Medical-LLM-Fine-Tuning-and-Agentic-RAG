@@ -5,3 +5,13 @@ agentic_rag/logs
 benchmark/.onbellek/
 qdrant_storage/
 *.safetensors
+
+# Sinav sorulari telifli (OSYM) — repo public oldugu surece asla commit edilmez.
+# Uretimi: benchmark/pdf_ayristir.py + benchmark/havuz_kur.py
+benchmark/veri/*.jsonl
+benchmark/veri_2006_2020/
+# Kosu ciktilari modelin tam metin cevaplarini icerir; acıklamalar sik
+# metinlerini alintiliyor, yani cevap anahtarini metinle birlikte yayinlamis
+# oluruz. Toplu sonuclar benchmark/SONUCLAR.md'de.
+benchmark/sonuclar/*.json
+__pycache__/

@@ -1,0 +1,40 @@
+ad: secici_rag
+aciklama: >-
+  Uyarlamali retrieval. Model once RAG'siz cevaplar; sectigi harfin olasiligi
+  dusukse VE bulunan pasaj yeterince ilgiliyse retrieval calisip yeniden
+  cevaplanir. 9 sinavda olculdu: hep-RAG'e gore +1,6 puan, retrieval cagrisi
+  %45'e dusuyor. Esikler 4 sinavda secildi, 3 sinavda dogrulandi (+1,7).
+
+model:
+  taban: Qwen/Qwen3.5-4B
+  adapter: tus-llm/tus-qwen35-4b-lora
+  alt_klasor: answering
+  revizyon: main
+  dtype: bfloat16
+
+uretim:
+  max_new_tokens: 64
+  do_sample: false
+  batch: 8
+
+sistem_mesaji: >-
+  Sen bir tıp uzmanısın. Aşağıdaki TUS sorusunu çöz. İlk satıra
+  'Doğru cevap: <harf>) <şık metni>' yaz, ardından kısa bir açıklama ver.
+
+sistem_mesaji_rag: >-
+  Sen bir tıp uzmanısın. Aşağıda bir TUS sorusu ve ders kitaplarından alınmış
+  ilgili bölümler var. Kaynak metni kullanarak soruyu çöz. İlk satıra
+  'Doğru cevap: <harf>) <şık metni>' yaz, ardından kısa bir açıklama ver.
+  Kaynak metin soruyu cevaplamıyorsa kendi tıbbi bilgini kullan.
+
+retrieval:
+  tur: secici
+  aday_n: 30
+  tut_n: 6
+  rrf_k: 60
+  reranker: BAAI/bge-reranker-v2-m3
+  context_karakter: 6000
+
+kapi:
+  guven_esik: 0.84     # bu olasiligin ALTINDA kal -> model emin degil
+  skor_esik: 0.2       # reranker en iyi pasaj skoru BU USTUNDE -> getirmeye deger

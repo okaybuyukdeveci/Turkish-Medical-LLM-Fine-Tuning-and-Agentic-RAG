@@ -1,0 +1,19 @@
+ad: baseline
+aciklama: Ince ayarsiz taban model. Karsilastirma zemini.
+
+model:
+  taban: Qwen/Qwen3.5-4B
+  dtype: bfloat16
+
+uretim:
+  max_new_tokens: 64
+  do_sample: false
+  batch: 8
+  # repetition_penalty KULLANILMIYOR - HF cezayi prompt tokenlarina da uyguluyor,
+  # model sik metnini kopyalamaktan kaciniyor ve dogruluk 2,5 puan dusuk olculuyor.
+
+sistem_mesaji: >-
+  Sen bir tıp uzmanısın. Aşağıdaki TUS sorusunu çöz. İlk satıra
+  'Doğru cevap: <harf>) <şık metni>' yaz, ardından kısa bir açıklama ver.
+
+retrieval: null

@@ -1,0 +1,26 @@
+ad: rag_baseline
+aciklama: >-
+  Ham model + RAG. SFT olmadan retrievalin tek basina katkisini olcer.
+
+model:
+  taban: Qwen/Qwen3.5-4B
+  dtype: bfloat16
+
+uretim:
+  max_new_tokens: 64
+  do_sample: false
+  batch: 4
+
+sistem_mesaji: >-
+  Sen bir tıp uzmanısın. Aşağıda bir TUS sorusu ve ders kitaplarından alınmış
+  ilgili bölümler var. Kaynak metni kullanarak soruyu çöz. İlk satıra
+  'Doğru cevap: <harf>) <şık metni>' yaz, ardından kısa bir açıklama ver.
+  Kaynak metin soruyu cevaplamıyorsa kendi tıbbi bilgini kullan.
+
+retrieval:
+  tur: hibrit_rerank
+  aday_n: 30               # her iki aramadan cekilen aday sayisi
+  tut_n: 6                 # rerank sonrasi modele giden
+  rrf_k: 60
+  reranker: BAAI/bge-reranker-v2-m3
+  context_karakter: 6000

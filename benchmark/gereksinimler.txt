@@ -18,3 +18,5 @@ langchain-text-splitters
 qdrant-client
 rank-bm25
 FlagEmbedding
+
+python-dotenv
